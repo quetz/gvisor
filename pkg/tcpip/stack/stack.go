@@ -188,6 +188,10 @@ type Stack struct {
 
 	// removeNICs indicates if the NICs and routes should be removed before saving.
 	removeNICs bool `state:"nosave"`
+
+	// externalNetworkingDisabled indicates whether external networking is
+	// disabled. This means all non-loopback NICs are disabled.
+	externalNetworkingDisabled bool
 }
 
 // NetworkProtocolFactory instantiates a network protocol.
@@ -2095,6 +2099,8 @@ func (s *Stack) ReplaceConfig(st *Stack) {
 		s.nics[id] = nic
 		if nic.IsLoopback() {
 			s.loopbackNIC = nic
+		} else if s.externalNetworkingDisabled {
+			nic.disable()
 		}
 		_ = s.NextNICID()
 	}
@@ -2572,4 +2578,28 @@ func (s *Stack) SetRemoveNICs() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.removeNICs = true
+}
+
+// DisableAllNonLoopbackNICs disables all non-loopback NICs in the stack.
+func (s *Stack) DisableAllNonLoopbackNICs() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.externalNetworkingDisabled = true
+	for _, nic := range s.nics {
+		if !nic.IsLoopback() {
+			nic.disable()
+		}
+	}
+}
+
+// EnableAllNonLoopbackNICs enables all non-loopback NICs in the stack.
+func (s *Stack) EnableAllNonLoopbackNICs() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.externalNetworkingDisabled = false
+	for _, nic := range s.nics {
+		if !nic.IsLoopback() {
+			nic.enable()
+		}
+	}
 }
